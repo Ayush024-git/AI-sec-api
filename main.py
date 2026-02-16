@@ -7,7 +7,6 @@ from openai import OpenAI
 # Initialize FastAPI
 app = FastAPI()
 
-# 👉 ADD IT HERE
 security = HTTPBearer()
 
 # Load environment keys
