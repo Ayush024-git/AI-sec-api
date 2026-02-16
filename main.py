@@ -6,18 +6,21 @@ from openai import OpenAI
 # Initialize FastAPI
 app = FastAPI()
 
-# Initialize OpenAI client
-key = os.getenv("OPEN_API_KEY")
+# Load environment keys
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+CUSTOMER_KEY = os.getenv("API_KEY")
 
-if key:
-    client = OpenAI(api_key=key)
+# Initialize OpenAI safely
+if OPENAI_KEY:
+    client = OpenAI(api_key=OPENAI_KEY)
 else:
-    client=none
+    client = None
+
 # Input schema
 class Input(BaseModel):
     text: str
 
-# Root check
+# Root health route
 @app.get("/")
 def root():
     return {"status": "AI Safety API running"}
@@ -26,9 +29,13 @@ def root():
 @app.post("/check")
 def check(input: Input, authorization: str = Header(None)):
 
-    # 🔐 API key protection (your customer key)
-    if authorization != f"Bearer {os.getenv('API_KEY')}":
+    # 🔐 API key protection
+    if authorization != f"Bearer {CUSTOMER_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Ensure AI client exists
+    if not client:
+        raise HTTPException(status_code=500, detail="OpenAI key missing")
 
     # 🧠 AI moderation prompt
     prompt = f"""
