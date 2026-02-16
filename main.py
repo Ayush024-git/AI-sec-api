@@ -7,8 +7,12 @@ from openai import OpenAI
 app = FastAPI()
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+key = os.getenv("OPEN_API_KEY")
 
+if key:
+    client = OpenAI(api_key=key)
+else:
+    client=none
 # Input schema
 class Input(BaseModel):
     text: str
