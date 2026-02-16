@@ -7,6 +7,9 @@ from openai import OpenAI
 # Initialize FastAPI
 app = FastAPI()
 
+# 👉 ADD IT HERE
+security = HTTPBearer()
+
 # Load environment keys
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 CUSTOMER_KEY = os.getenv("API_KEY")
