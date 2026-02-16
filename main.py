@@ -72,5 +72,3 @@ Sentence:
 
     # Extract AI output
     result = response.choices[0].message.content
-
-    return result
