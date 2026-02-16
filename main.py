@@ -29,6 +29,11 @@ def root():
 @app.post("/check")
 def check(input: Input, authorization: str = Header(None)):
 
+    return {
+        "received_header": authorization,
+        "expected_header": f"Bearer {CUSTOMER_KEY}"
+    }
+
     # 🔐 API key protection
     if authorization != f"Bearer {CUSTOMER_KEY}":
         raise HTTPException(status_code=401, detail="Unauthorized")
