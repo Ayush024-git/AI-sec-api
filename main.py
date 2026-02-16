@@ -6,7 +6,7 @@ from openai import OpenAI
 # Initialize FastAPI
 app = FastAPI()
 
-# Load environment key
+# Load environment keys
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 CUSTOMER_KEY = os.getenv("API_KEY")
 
@@ -28,11 +28,6 @@ def root():
 # Safety check endpoint
 @app.post("/check")
 def check(input: Input, authorization: str = Header(None)):
-
-    return {
-        "received_header": authorization,
-        "expected_header": f"Bearer {CUSTOMER_KEY}"
-    }
 
     # 🔐 API key protection
     if authorization != f"Bearer {CUSTOMER_KEY}":
