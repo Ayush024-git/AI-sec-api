@@ -33,6 +33,7 @@ def root():
 def check(
     input: Input,
     credentials: HTTPAuthorizationCredentials = Depends(security)
+):
 
     # 🔐 API key protection
     token = credentials.credentials
