@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import os
@@ -30,10 +30,13 @@ def root():
 
 # Safety check endpoint
 @app.post("/check")
-def check(input: Input, authorization: str = Header(None)):
+def check(
+    input: Input,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 
     # 🔐 API key protection
-    if authorization != f"Bearer {CUSTOMER_KEY}":
+    token = credentials.credentials
+    if token != CUSTOMER_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Ensure AI client exists
