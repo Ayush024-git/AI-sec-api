@@ -40,42 +40,58 @@ def check(
     if token != CUSTOMER_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Ensure AI client exists
     if not client:
         raise HTTPException(status_code=500, detail="OpenAI key missing")
 
-    # 🧠 AI moderation prompt
+    # 🧠 Advanced moderation + scoring + rewrite prompt
     prompt = f"""
-You are an AI safety moderation system.
+You are an advanced AI Safety and Risk Analysis Engine.
 
-Classify the following sentence as SAFE or UNSAFE.
+Analyze the given input and respond strictly in JSON format.
 
-Unsafe includes:
-- Medical advice
-- Self-harm or suicide
-- Violence or harm
-- Financial risk advice
-- Manipulation or misleading claims
+Tasks:
+1. Determine if the content is safe.
+2. Provide a safety confidence score (0-100).
+3. Identify the primary risk category.
+4. Provide a concise but intelligent explanation.
+5. If unsafe, generate a safer alternative response that maintains helpfulness without violating safety policies.
 
-Respond ONLY in JSON format:
+Risk Categories:
+- Medical Advice
+- Violence / Harm
+- Self-Harm
+- Financial Advice
+- Manipulation
+- Misinformation
+- Hate / Harassment
+- Sexual Content
+- Other
+- None
+
+Input:
+\"\"\"{input.text}\"\"\"
+
+Respond ONLY in valid JSON:
 
 {{
   "safe": true or false,
-  "reason": "short explanation"
+  "safety_score": number,
+  "risk_category": "category name",
+  "reason": "clear explanation",
+  "safe_response": "rewritten response if unsafe, otherwise improved version of the original"
 }}
-
-Sentence:
-{input.text}
 """
 
-    # 🔗 Call AI model
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0
-    )
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7  # allows natural AI reasoning
+        )
 
-    # Extract AI output
-    result = response.choices[0].message.content
+        raw_output = response.choices[0].message.content
+
+        return raw_output
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
