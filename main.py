@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import os
-from openai import OpenAI
+import google.generativeai as genai
 
 # Initialize FastAPI
 app = FastAPI()
@@ -10,14 +10,14 @@ app = FastAPI()
 security = HTTPBearer()
 
 # Load environment keys
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 CUSTOMER_KEY = os.getenv("API_KEY")
 
 # Initialize OpenAI safely
-if OPENAI_KEY:
-    client = OpenAI(api_key=OPENAI_KEY)
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
 else:
-    client = None
+    genai = None
 
 # Input schema
 class Input(BaseModel):
@@ -40,23 +40,25 @@ def check(
     if token != CUSTOMER_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if not client:
-        raise HTTPException(status_code=500, detail="OpenAI key missing")
+    # Ensure Gemini key exists
+    if not GEMINI_KEY:
+        raise HTTPException(status_code=500, detail="Gemini API key missing")
 
-    # 🧠 Advanced moderation + scoring + rewrite prompt
+    # 🧠 Advanced AI Safety Prompt
     prompt = f"""
-You are an advanced AI Safety and Risk Analysis Engine.
+You are an advanced AI Safety Moderation and Response Engine.
 
-Analyze the given input and respond strictly in JSON format.
+Analyze the input text and respond strictly in JSON format.
 
 Tasks:
-1. Determine if the content is safe.
-2. Provide a safety confidence score (0-100).
-3. Identify the primary risk category.
-4. Provide a concise but intelligent explanation.
-5. If unsafe, generate a safer alternative response that maintains helpfulness without violating safety policies.
 
-Risk Categories:
+1. Determine if the content is SAFE or UNSAFE.
+2. Provide a safety confidence score (0–100).
+3. Identify the primary risk category.
+4. Give a clear reasoning.
+5. If unsafe, generate a safer rewritten response that removes harmful elements while preserving helpful intent.
+
+Risk categories include:
 - Medical Advice
 - Violence / Harm
 - Self-Harm
@@ -71,25 +73,23 @@ Risk Categories:
 Input:
 \"\"\"{input.text}\"\"\"
 
-Respond ONLY in valid JSON:
+Respond ONLY in JSON like:
 
 {{
   "safe": true or false,
   "safety_score": number,
-  "risk_category": "category name",
-  "reason": "clear explanation",
-  "safe_response": "rewritten response if unsafe, otherwise improved version of the original"
+  "risk_category": "category",
+  "reason": "explanation",
+  "safe_response": "rewritten safer version"
 }}
 """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7  # allows natural AI reasoning
-        )
+        # Gemini model call
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
 
-        raw_output = response.choices[0].message.content
+        raw_output = response.text
 
         return raw_output
 
