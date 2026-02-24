@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from openai import OpenAI
+import requests
 import os
 
 # Initialize FastAPI
@@ -9,15 +9,8 @@ app = FastAPI()
 
 security = HTTPBearer()
 
-# Load environment keys
-OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+# Load client auth key (keep this)
 CUSTOMER_KEY = os.getenv("API_KEY")
-
-# Initialize OpenRouter client
-client = OpenAI(
-    api_key=OPENROUTER_KEY,
-    base_url="https://openrouter.ai/api/v1"
-)
 
 # Input schema
 class Input(BaseModel):
@@ -26,7 +19,7 @@ class Input(BaseModel):
 # Root health route
 @app.get("/")
 def root():
-    return {"status": "AI Safety API running (OpenRouter)"}
+    return {"status": "AI Safety API running (Local TinyLlama)"}
 
 # Safety check endpoint
 @app.post("/check")
@@ -39,9 +32,6 @@ def check(
     token = credentials.credentials
     if token != CUSTOMER_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-    if not OPENROUTER_KEY:
-        raise HTTPException(status_code=500, detail="OpenRouter API key missing")
 
     # 🧠 Advanced AI Safety Prompt
     prompt = f"""
@@ -84,18 +74,19 @@ Respond ONLY in JSON like:
 """
 
     try:
-        # 🔗 OpenRouter Llama 3 call
-        response = client.chat.completions.create(
-            model="meta-llama/llama-3-8b-instruct",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3
+        # 🔗 Call TinyLlama locally via Ollama
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "tinyllama",
+                "prompt": prompt,
+                "stream": False
+            }
         )
 
-        raw_output = response.choices[0].message.content
+        raw_output = response.json()["response"]
 
         return raw_output
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
