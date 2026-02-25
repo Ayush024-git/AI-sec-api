@@ -121,7 +121,7 @@ Text:
 
         raw_output = response.choices[0].message.content
 
-        # Try parsing JSON
+        # Try JSON
         try:
             parsed = json.loads(raw_output)
         except:
