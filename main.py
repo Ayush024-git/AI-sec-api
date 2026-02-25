@@ -1,44 +1,65 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from openai import OpenAI
 import os
 import json
 
-# Initialize FastAPI
-app = FastAPI()
+# ---------------- INIT ----------------
 
+app = FastAPI()
 security = HTTPBearer()
 
-# Load environment keys
+templates = Jinja2Templates(directory="templates")
+
+# ---------------- KEYS ----------------
+
 CUSTOMER_KEY = os.getenv("API_KEY")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-# Initialize OpenAI client
 if OPENAI_KEY:
     client = OpenAI(api_key=OPENAI_KEY)
 else:
     client = None
 
 
-# Input schema
+# ---------------- INPUT SCHEMA ----------------
+
 class Input(BaseModel):
     text: str
 
 
-# Root health route
-@app.get("/")
-def root():
+# ---------------- DASHBOARD ROUTE ----------------
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request}
+    )
+
+
+# ---------------- HEALTH CHECK ----------------
+
+@app.get("/health")
+def health():
     return {"status": "AI Safety API running (OpenAI Cloud)"}
 
 
-# Debug route
+# ---------------- DEBUG ROUTE ----------------
+
 @app.get("/debug-key")
 def debug_key():
-    return {"loaded_api_key": CUSTOMER_KEY is not None}
+    return {
+        "customer_key_loaded": CUSTOMER_KEY is not None,
+        "openai_key_loaded": OPENAI_KEY is not None
+    }
 
 
-# Safety check endpoint
+# ---------------- SAFETY CHECK ----------------
+
 @app.post("/check")
 def check(
     input: Input,
@@ -47,15 +68,25 @@ def check(
 
     # 🔐 API key protection
     if not CUSTOMER_KEY:
-        raise HTTPException(status_code=500, detail="Server API_KEY not set")
+        raise HTTPException(
+            status_code=500,
+            detail="Server API_KEY not set"
+        )
 
     token = credentials.credentials
+
     if token != CUSTOMER_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized"
+        )
 
     # Ensure OpenAI key exists
     if not client:
-        raise HTTPException(status_code=500, detail="OpenAI key missing")
+        raise HTTPException(
+            status_code=500,
+            detail="OpenAI key missing"
+        )
 
     # 🧠 Safety prompt
     prompt = f"""
