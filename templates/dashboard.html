@@ -1,1 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Guard Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
 
+<body class="bg-gray-950 text-white min-h-screen">
+
+<div class="flex">
+
+    <!-- Sidebar -->
+    <div class="w-64 bg-gray-900 p-6 space-y-6">
+        <h1 class="text-2xl font-bold">AI Guard</h1>
+
+        <nav class="space-y-4 text-gray-400">
+            <div>Dashboard</div>
+            <div>Moderation</div>
+            <div>Logs</div>
+            <div>API Keys</div>
+        </nav>
+    </div>
+
+    <!-- Main -->
+    <div class="flex-1 p-10 space-y-10">
+
+        <!-- Header -->
+        <div>
+            <h2 class="text-3xl font-bold">AI Safety Moderation</h2>
+            <p class="text-gray-400">Analyze text for safety risks</p>
+        </div>
+
+        <!-- Input Card -->
+        <div class="bg-gray-900 p-6 rounded-xl shadow-lg space-y-4">
+            <textarea
+                id="inputText"
+                placeholder="Enter text to analyze..."
+                class="w-full p-4 bg-gray-800 rounded-lg border border-gray-700"
+                rows="5"
+            ></textarea>
+
+            <button
+                onclick="analyze()"
+                class="bg-green-500 hover:bg-green-600 px-6 py-2 rounded-lg font-semibold"
+            >
+                Analyze
+            </button>
+        </div>
+
+        <!-- Result Card -->
+        <div id="resultCard" class="hidden bg-gray-900 p-6 rounded-xl shadow-lg space-y-4">
+
+            <div id="statusBadge" class="px-4 py-2 rounded-lg inline-block font-bold"></div>
+
+            <div>
+                <strong>Safety Score:</strong>
+                <span id="score"></span>%
+            </div>
+
+            <div>
+                <strong>Risk Category:</strong>
+                <span id="category"></span>
+            </div>
+
+            <div>
+                <strong>Reason:</strong>
+                <p id="reason" class="text-gray-300 mt-1"></p>
+            </div>
+
+            <div>
+                <strong>Safer Response:</strong>
+                <div id="safeResponse" class="bg-gray-800 p-3 rounded-lg mt-2"></div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+async function analyze() {
+
+    const text = document.getElementById("inputText").value;
+
+    const response = await fetch("/check", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer sk-client-024"
+        },
+        body: JSON.stringify({ text: text })
+    });
+
+    const data = await response.json();
+
+    const card = document.getElementById("resultCard");
+    card.classList.remove("hidden");
+
+    if (data.safe === true) {
+        document.getElementById("statusBadge").innerText = "SAFE";
+        document.getElementById("statusBadge").className =
+            "px-4 py-2 rounded-lg inline-block font-bold bg-green-600";
+    } else {
+        document.getElementById("statusBadge").innerText = "UNSAFE";
+        document.getElementById("statusBadge").className =
+            "px-4 py-2 rounded-lg inline-block font-bold bg-red-600";
+    }
+
+    document.getElementById("score").innerText = data.safety_score || 0;
+    document.getElementById("category").innerText = data.risk_category || "N/A";
+    document.getElementById("reason").innerText = data.reason || "No reason provided";
+    document.getElementById("safeResponse").innerText = data.safe_response || "N/A";
+}
+
+</script>
+
+</body>
+</html>
