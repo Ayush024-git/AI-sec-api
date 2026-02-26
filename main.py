@@ -45,7 +45,9 @@ def dashboard(request: Request):
 
 @app.get("/health")
 def health():
-    return {"status": "AI Safety API running (OpenAI Cloud)"}
+    return {
+        "status": "AI Safety + Factuality API running (OpenAI Cloud)"
+    }
 
 
 # ---------------- DEBUG ROUTE ----------------
@@ -58,7 +60,7 @@ def debug_key():
     }
 
 
-# ---------------- SAFETY CHECK ----------------
+# ---------------- SAFETY + FACTUALITY CHECK ----------------
 
 @app.post("/check")
 def check(
@@ -88,22 +90,44 @@ def check(
             detail="OpenAI key missing"
         )
 
-    # 🧠 Safety prompt
+    # 🧠 Safety + Factuality Prompt
     prompt = f"""
-You are an advanced AI Safety Moderation and Response Engine.
+You are an AI Safety and Factuality Evaluation Engine.
 
-Analyze the input text and respond in STRICT JSON ONLY.
+Analyze the text on TWO dimensions:
 
-Fields required:
+---------------- SAFETY ----------------
+Return:
+- safe (true/false)
+- safety_score (0–100)
+- risk_category
+- reason
 
-safe → true or false  
-safety_score → 0–100  
-risk_category → category  
-reason → explanation  
-safe_response → safer rewritten version  
+---------------- FACTUALITY ----------------
+Return:
+- factual (true/false)
+- factuality_score (0–100)
+- factuality_reason
 
-If unsafe → rewrite safely.  
-If safe → repeat input politely.
+---------------- REWRITES ----------------
+If unsafe → generate safer_response.
+If non-factual → generate corrected_response.
+
+Return STRICT JSON only:
+
+{{
+  "safe": true/false,
+  "safety_score": number,
+  "risk_category": "category",
+  "reason": "explanation",
+
+  "factual": true/false,
+  "factuality_score": number,
+  "factuality_reason": "explanation",
+
+  "safer_response": "rewrite if unsafe",
+  "corrected_response": "rewrite if non-factual"
+}}
 
 Text:
 \"\"\"{input.text}\"\"\"
@@ -112,28 +136,36 @@ Text:
     try:
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  
             messages=[
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "Return only valid JSON. No extra text."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
-            temperature=0.2
+            temperature=0
         )
 
-        raw_output = response.choices[0].message.content
+        raw_output = response.choices[0].message.content.strip()
 
-        # Try JSON
+        # Try parsing JSON
         try:
             parsed = json.loads(raw_output)
-        except:
-            parsed = {
-                "raw_model_output": raw_output,
-                "note": "Model did not return strict JSON"
-            }
+            return parsed
 
-        return parsed
+        except json.JSONDecodeError:
+            return {
+                "error": "Model did not return valid JSON",
+                "raw_output": raw_output
+            }
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=str(e)
         )
+        
