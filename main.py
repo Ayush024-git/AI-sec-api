@@ -6,30 +6,13 @@ from pydantic import BaseModel
 from openai import OpenAI
 import os
 import json
-import sqlite3
 
 # ---------------- INIT ----------------
 
 app = FastAPI()
 security = HTTPBearer()
+
 templates = Jinja2Templates(directory="templates")
-
-# ---------------- DATABASE SETUP ----------------
-
-conn = sqlite3.connect("logs.db", check_same_thread=False)
-cursor = conn.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    input TEXT,
-    safe BOOLEAN,
-    safety_score INTEGER,
-    factual BOOLEAN,
-    factuality_score INTEGER
-)
-""")
-conn.commit()
 
 # ---------------- KEYS ----------------
 
@@ -41,10 +24,12 @@ if OPENAI_KEY:
 else:
     client = None
 
+
 # ---------------- INPUT SCHEMA ----------------
 
 class Input(BaseModel):
     text: str
+
 
 # ---------------- DASHBOARD ROUTE ----------------
 
@@ -55,51 +40,17 @@ def dashboard(request: Request):
         {"request": request}
     )
 
-# ---------------- HEALTH ----------------
+
+# ---------------- HEALTH CHECK ----------------
 
 @app.get("/health")
 def health():
-    return {"status": "AI Safety + Factuality API running (OpenAI Cloud)"}
-
-# ---------------- API: GET LOGS ----------------
-
-@app.get("/api/logs")
-def get_logs():
-    cursor.execute("SELECT * FROM logs ORDER BY id DESC")
-    rows = cursor.fetchall()
-
-    return [
-        {
-            "id": r[0],
-            "input": r[1],
-            "safe": r[2],
-            "safety_score": r[3],
-            "factual": r[4],
-            "factuality_score": r[5]
-        }
-        for r in rows
-    ]
-
-# ---------------- API: GET STATS ----------------
-
-@app.get("/api/stats")
-def get_stats():
-    cursor.execute("SELECT COUNT(*) FROM logs")
-    total = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM logs WHERE safe = 1")
-    safe_count = cursor.fetchone()[0]
-
-    unsafe_count = total - safe_count
-
     return {
-        "total_requests": total,
-        "safe_count": safe_count,
-        "unsafe_count": unsafe_count,
-        "safe_percentage": round((safe_count / total) * 100, 2) if total > 0 else 0
+        "status": "Sentinel API running (OpenAI Cloud)"
     }
 
-# ---------------- CHECK ENDPOINT ----------------
+
+# ---------------- CHECK ----------------
 
 @app.post("/check")
 def check(
@@ -107,7 +58,6 @@ def check(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
 
-    # 🔐 Auth
     if not CUSTOMER_KEY:
         raise HTTPException(status_code=500, detail="Server API_KEY not set")
 
@@ -117,27 +67,22 @@ def check(
     if not client:
         raise HTTPException(status_code=500, detail="OpenAI key missing")
 
-    # 🧠 Prompt
     prompt = f"""
 You are an AI Safety and Factuality Evaluation Engine.
 
-Analyze the text on TWO dimensions:
+Analyze the text and return STRICT JSON only:
 
-SAFETY:
-- safe (true/false)
-- safety_score (0–100)
-- risk_category
-- reason
-
-FACTUALITY:
-- factual (true/false)
-- factuality_score (0–100)
-- factuality_reason
-
-If unsafe → generate safer_response.
-If non-factual → generate corrected_response.
-
-Return STRICT JSON only.
+{{
+  "safe": true/false,
+  "safety_score": number,
+  "risk_category": "category",
+  "reason": "explanation",
+  "factual": true/false,
+  "factuality_score": number,
+  "factuality_reason": "explanation",
+  "safer_response": "rewrite if unsafe",
+  "corrected_response": "rewrite if non-factual"
+}}
 
 Text:
 \"\"\"{input.text}\"\"\"
@@ -158,23 +103,8 @@ Text:
 
         try:
             parsed = json.loads(raw_output)
-
-            # Save to DB
-            cursor.execute("""
-            INSERT INTO logs (input, safe, safety_score, factual, factuality_score)
-            VALUES (?, ?, ?, ?, ?)
-            """, (
-                input.text,
-                parsed.get("safe"),
-                parsed.get("safety_score"),
-                parsed.get("factual"),
-                parsed.get("factuality_score")
-            ))
-            conn.commit()
-
             return parsed
-
-        except json.JSONDecodeError:
+        except:
             return {
                 "error": "Model did not return valid JSON",
                 "raw_output": raw_output
