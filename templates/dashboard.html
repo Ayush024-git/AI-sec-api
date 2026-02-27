@@ -23,7 +23,7 @@
             <p class="text-gray-400">Safety and factuality evaluation</p>
         </div>
 
-        <!-- Input -->
+        <!-- Input Card -->
         <div class="bg-gray-900 p-6 rounded-xl space-y-4">
             <textarea
                 id="inputText"
@@ -40,27 +40,29 @@
             </button>
         </div>
 
-        <!-- Result -->
+        <!-- Result Card -->
         <div id="resultCard" class="hidden bg-gray-900 p-6 rounded-xl space-y-4">
 
             <div id="statusBadge" class="px-4 py-2 rounded-lg inline-block font-bold"></div>
 
-            <div><strong>Safety Score:</strong> <span id="score"></span>%</div>
-            <div><strong>Risk Category:</strong> <span id="category"></span></div>
-            <div><strong>Reason:</strong> <p id="reason"></p></div>
+            <div><strong>Safety Score:</strong> <span id="score">0</span>%</div>
+            <div><strong>Risk Category:</strong> <span id="category">N/A</span></div>
+            <div><strong>Reason:</strong> <p id="reason">N/A</p></div>
 
             <hr class="border-gray-700">
 
-            <div><strong>Factual:</strong> <span id="factualStatus"></span></div>
-            <div><strong>Factuality Score:</strong> <span id="factualScore"></span>%</div>
-            <div><strong>Factuality Reason:</strong> <p id="factualReason"></p></div>
+            <div><strong>Factual Status:</strong> <span id="factualStatus">N/A</span></div>
+            <div><strong>Factuality Score:</strong> <span id="factualScore">0</span>%</div>
+            <div><strong>Factuality Reason:</strong> <p id="factualReason">N/A</p></div>
 
-            <div><strong>Safer Response:</strong>
-                <div id="safeResponse" class="bg-gray-800 p-3 rounded-lg"></div>
+            <div>
+                <strong>Safer Response:</strong>
+                <div id="safeResponse" class="bg-gray-800 p-3 rounded-lg mt-2">N/A</div>
             </div>
 
-            <div><strong>Corrected Response:</strong>
-                <div id="correctedResponse" class="bg-gray-800 p-3 rounded-lg"></div>
+            <div>
+                <strong>Corrected Response:</strong>
+                <div id="correctedResponse" class="bg-gray-800 p-3 rounded-lg mt-2">N/A</div>
             </div>
 
         </div>
@@ -72,47 +74,77 @@
 
 async function analyze() {
 
-    const text = document.getElementById("inputText").value;
+    const text = document.getElementById("inputText").value.trim();
 
-    const response = await fetch("/check", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer sk-client-024"
-        },
-        body: JSON.stringify({ text: text })
-    });
+    if (!text) {
+        alert("Please enter text to analyze.");
+        return;
+    }
 
-    const data = await response.json();
+    try {
 
-    document.getElementById("resultCard").classList.remove("hidden");
+        const response = await fetch("/check", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer sk-client-024"
+            },
+            body: JSON.stringify({ text: text })
+        });
 
-    document.getElementById("statusBadge").innerText =
-        data.safe ? "SAFE" : "UNSAFE";
+        const data = await response.json();
 
-    document.getElementById("statusBadge").className =
-        data.safe
-            ? "px-4 py-2 rounded-lg inline-block font-bold bg-green-600"
-            : "px-4 py-2 rounded-lg inline-block font-bold bg-red-600";
+        console.log("API Response:", data);
 
-    document.getElementById("score").innerText = data.safety_score || 0;
-    document.getElementById("category").innerText = data.risk_category || "N/A";
-    document.getElementById("reason").innerText = data.reason || "N/A";
+        document.getElementById("resultCard").classList.remove("hidden");
 
-    document.getElementById("factualStatus").innerText =
-        data.factual ? "FACTUAL" : "NON-FACTUAL";
+        // -------- SAFE HANDLING --------
+        const isSafe = String(data.safe).toLowerCase() === "true";
 
-    document.getElementById("factualScore").innerText =
-        data.factuality_score || 0;
+        document.getElementById("statusBadge").innerText =
+            isSafe ? "SAFE" : "UNSAFE";
 
-    document.getElementById("factualReason").innerText =
-        data.factuality_reason || "N/A";
+        document.getElementById("statusBadge").className =
+            isSafe
+                ? "px-4 py-2 rounded-lg inline-block font-bold bg-green-600"
+                : "px-4 py-2 rounded-lg inline-block font-bold bg-red-600";
 
-    document.getElementById("safeResponse").innerText =
-        data.safer_response || "N/A";
+        // -------- SAFETY DATA --------
+        document.getElementById("score").innerText =
+            parseInt(data.safety_score) || 0;
 
-    document.getElementById("correctedResponse").innerText =
-        data.corrected_response || "N/A";
+        document.getElementById("category").innerText =
+            data.risk_category || "N/A";
+
+        document.getElementById("reason").innerText =
+            data.reason || "N/A";
+
+        // -------- FACTUAL HANDLING --------
+        const isFactual = String(data.factual).toLowerCase() === "true";
+
+        document.getElementById("factualStatus").innerText =
+            isFactual ? "FACTUAL" : "NON-FACTUAL";
+
+        document.getElementById("factualScore").innerText =
+            parseInt(data.factuality_score) || 0;
+
+        document.getElementById("factualReason").innerText =
+            data.factuality_reason || "N/A";
+
+        // -------- REWRITES --------
+        document.getElementById("safeResponse").innerText =
+            data.safer_response || "N/A";
+
+        document.getElementById("correctedResponse").innerText =
+            data.corrected_response || "N/A";
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert("Error connecting to Sentinel API.");
+
+    }
 }
 
 </script>
