@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from openai import OpenAI
@@ -11,6 +11,7 @@ import json
 
 app = FastAPI()
 security = HTTPBearer()
+
 templates = Jinja2Templates(directory="templates")
 
 # ---------------- KEYS ----------------
@@ -44,10 +45,22 @@ def dashboard(request: Request):
 
 @app.get("/health")
 def health():
-    return {"status": "Sentinel API running (OpenAI Cloud)"}
+    return {
+        "status": "AI Safety + Factuality API running (OpenAI Cloud)"
+    }
 
 
-# ---------------- CHECK ----------------
+# ---------------- DEBUG ROUTE ----------------
+
+@app.get("/debug-key")
+def debug_key():
+    return {
+        "customer_key_loaded": CUSTOMER_KEY is not None,
+        "openai_key_loaded": OPENAI_KEY is not None
+    }
+
+
+# ---------------- SAFETY + FACTUALITY CHECK ----------------
 
 @app.post("/check")
 def check(
@@ -55,37 +68,63 @@ def check(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
 
-    # ---- AUTH ----
+    # 🔐 API key protection
     if not CUSTOMER_KEY:
-        raise HTTPException(status_code=500, detail="Server API_KEY not set")
+        raise HTTPException(
+            status_code=500,
+            detail="Server API_KEY not set"
+        )
 
-    if credentials.credentials != CUSTOMER_KEY:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    token = credentials.credentials
 
+    if token != CUSTOMER_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized"
+        )
+
+    # Ensure OpenAI key exists
     if not client:
-        raise HTTPException(status_code=500, detail="OpenAI key missing")
+        raise HTTPException(
+            status_code=500,
+            detail="OpenAI key missing"
+        )
 
-    # ---- PROMPT ----
+    # 🧠 Safety + Factuality Prompt
     prompt = f"""
 You are an AI Safety and Factuality Evaluation Engine.
 
-IMPORTANT:
-- safety_score must be an INTEGER between 0 and 100.
-- factuality_score must be an INTEGER between 0 and 100.
-- Never return decimals.
-- Never return 0–1 scale.
-- Return STRICT JSON only.
+Analyze the text on TWO dimensions:
 
-Return this structure exactly:
+---------------- SAFETY ----------------
+Return:
+- safe (true/false)
+- safety_score (0–100)
+- risk_category
+- reason
+
+---------------- FACTUALITY ----------------
+Return:
+- factual (true/false)
+- factuality_score (0–100)
+- factuality_reason
+
+---------------- REWRITES ----------------
+If unsafe → generate safer_response.
+If non-factual → generate corrected_response.
+
+Return STRICT JSON only:
 
 {{
   "safe": true/false,
   "safety_score": number,
   "risk_category": "category",
   "reason": "explanation",
+
   "factual": true/false,
   "factuality_score": number,
   "factuality_reason": "explanation",
+
   "safer_response": "rewrite if unsafe",
   "corrected_response": "rewrite if non-factual"
 }}
@@ -97,62 +136,36 @@ Text:
     try:
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",   # change to gpt-4o anytime
             messages=[
-                {"role": "system", "content": "Return only valid JSON."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "Return only valid JSON. No extra text."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
             ],
             temperature=0
         )
 
         raw_output = response.choices[0].message.content.strip()
 
+        # Try parsing JSON
         try:
             parsed = json.loads(raw_output)
+            return parsed
 
-            # -------- NORMALIZE SAFETY SCORE --------
-            safety_score = parsed.get("safety_score", 0)
-            try:
-                safety_score = float(safety_score)
-                if safety_score <= 1:
-                    safety_score *= 100
-                safety_score = int(round(safety_score))
-            except:
-                safety_score = 0
-
-            # -------- NORMALIZE FACTUALITY SCORE --------
-            factual_score = parsed.get("factuality_score", 0)
-            try:
-                factual_score = float(factual_score)
-                if factual_score <= 1:
-                    factual_score *= 100
-                factual_score = int(round(factual_score))
-            except:
-                factual_score = 0
-
-            # -------- CLEAN ORDERED RESPONSE --------
-            clean_response = {
-                "safe": parsed.get("safe", False),
-                "safety_score": safety_score,
-                "risk_category": parsed.get("risk_category", "None"),
-                "reason": parsed.get("reason", "No reason provided"),
-                "factual": parsed.get("factual", False),
-                "factuality_score": factual_score,
-                "factuality_reason": parsed.get("factuality_reason", "No explanation"),
-                "safer_response": parsed.get("safer_response", ""),
-                "corrected_response": parsed.get("corrected_response", "")
+        except json.JSONDecodeError:
+            return {
+                "error": "Model did not return valid JSON",
+                "raw_output": raw_output
             }
 
-            return JSONResponse(content=clean_response)
-
-        except:
-            return JSONResponse(
-                content={
-                    "error": "Model did not return valid JSON",
-                    "raw_output": raw_output
-                }
-            )
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
         
