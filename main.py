@@ -6,13 +6,30 @@ from pydantic import BaseModel
 from openai import OpenAI
 import os
 import json
+import sqlite3
 
 # ---------------- INIT ----------------
 
 app = FastAPI()
 security = HTTPBearer()
-
 templates = Jinja2Templates(directory="templates")
+
+# ---------------- DATABASE SETUP ----------------
+
+conn = sqlite3.connect("logs.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    input TEXT,
+    safe BOOLEAN,
+    safety_score INTEGER,
+    factual BOOLEAN,
+    factuality_score INTEGER
+)
+""")
+conn.commit()
 
 # ---------------- KEYS ----------------
 
@@ -24,12 +41,10 @@ if OPENAI_KEY:
 else:
     client = None
 
-
 # ---------------- INPUT SCHEMA ----------------
 
 class Input(BaseModel):
     text: str
-
 
 # ---------------- DASHBOARD ROUTE ----------------
 
@@ -40,27 +55,51 @@ def dashboard(request: Request):
         {"request": request}
     )
 
-
-# ---------------- HEALTH CHECK ----------------
+# ---------------- HEALTH ----------------
 
 @app.get("/health")
 def health():
+    return {"status": "AI Safety + Factuality API running (OpenAI Cloud)"}
+
+# ---------------- API: GET LOGS ----------------
+
+@app.get("/api/logs")
+def get_logs():
+    cursor.execute("SELECT * FROM logs ORDER BY id DESC")
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "id": r[0],
+            "input": r[1],
+            "safe": r[2],
+            "safety_score": r[3],
+            "factual": r[4],
+            "factuality_score": r[5]
+        }
+        for r in rows
+    ]
+
+# ---------------- API: GET STATS ----------------
+
+@app.get("/api/stats")
+def get_stats():
+    cursor.execute("SELECT COUNT(*) FROM logs")
+    total = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM logs WHERE safe = 1")
+    safe_count = cursor.fetchone()[0]
+
+    unsafe_count = total - safe_count
+
     return {
-        "status": "AI Safety + Factuality API running (OpenAI Cloud)"
+        "total_requests": total,
+        "safe_count": safe_count,
+        "unsafe_count": unsafe_count,
+        "safe_percentage": round((safe_count / total) * 100, 2) if total > 0 else 0
     }
 
-
-# ---------------- DEBUG ROUTE ----------------
-
-@app.get("/debug-key")
-def debug_key():
-    return {
-        "customer_key_loaded": CUSTOMER_KEY is not None,
-        "openai_key_loaded": OPENAI_KEY is not None
-    }
-
-
-# ---------------- SAFETY + FACTUALITY CHECK ----------------
+# ---------------- CHECK ENDPOINT ----------------
 
 @app.post("/check")
 def check(
@@ -68,66 +107,37 @@ def check(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
 
-    # 🔐 API key protection
+    # 🔐 Auth
     if not CUSTOMER_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="Server API_KEY not set"
-        )
+        raise HTTPException(status_code=500, detail="Server API_KEY not set")
 
-    token = credentials.credentials
+    if credentials.credentials != CUSTOMER_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if token != CUSTOMER_KEY:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized"
-        )
-
-    # Ensure OpenAI key exists
     if not client:
-        raise HTTPException(
-            status_code=500,
-            detail="OpenAI key missing"
-        )
+        raise HTTPException(status_code=500, detail="OpenAI key missing")
 
-    # 🧠 Safety + Factuality Prompt
+    # 🧠 Prompt
     prompt = f"""
 You are an AI Safety and Factuality Evaluation Engine.
 
 Analyze the text on TWO dimensions:
 
----------------- SAFETY ----------------
-Return:
+SAFETY:
 - safe (true/false)
 - safety_score (0–100)
 - risk_category
 - reason
 
----------------- FACTUALITY ----------------
-Return:
+FACTUALITY:
 - factual (true/false)
 - factuality_score (0–100)
 - factuality_reason
 
----------------- REWRITES ----------------
 If unsafe → generate safer_response.
 If non-factual → generate corrected_response.
 
-Return STRICT JSON only:
-
-{{
-  "safe": true/false,
-  "safety_score": number,
-  "risk_category": "category",
-  "reason": "explanation",
-
-  "factual": true/false,
-  "factuality_score": number,
-  "factuality_reason": "explanation",
-
-  "safer_response": "rewrite if unsafe",
-  "corrected_response": "rewrite if non-factual"
-}}
+Return STRICT JSON only.
 
 Text:
 \"\"\"{input.text}\"\"\"
@@ -136,25 +146,32 @@ Text:
     try:
 
         response = client.chat.completions.create(
-            model="gpt-4o",  
+            model="gpt-4o",
             messages=[
-                {
-                    "role": "system",
-                    "content": "Return only valid JSON. No extra text."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
+                {"role": "system", "content": "Return only valid JSON."},
+                {"role": "user", "content": prompt}
             ],
             temperature=0
         )
 
         raw_output = response.choices[0].message.content.strip()
 
-        # Try parsing JSON
         try:
             parsed = json.loads(raw_output)
+
+            # Save to DB
+            cursor.execute("""
+            INSERT INTO logs (input, safe, safety_score, factual, factuality_score)
+            VALUES (?, ?, ?, ?, ?)
+            """, (
+                input.text,
+                parsed.get("safe"),
+                parsed.get("safety_score"),
+                parsed.get("factual"),
+                parsed.get("factuality_score")
+            ))
+            conn.commit()
+
             return parsed
 
         except json.JSONDecodeError:
@@ -164,8 +181,5 @@ Text:
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
         
