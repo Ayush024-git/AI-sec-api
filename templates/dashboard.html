@@ -10,130 +10,57 @@
 <div class="flex">
 
     <!-- Sidebar -->
-    <div class="w-64 bg-gray-900 p-6 space-y-6 border-r border-gray-800">
-        <div>
-            <h1 class="text-2xl font-bold text-white">Sentinel</h1>
-            <p class="text-xs text-gray-500 mt-1">by GREM.xv</p>
-        </div>
-
-        <nav class="space-y-4 text-gray-400 mt-8">
-            <div onclick="showSection('dashboard')" class="cursor-pointer hover:text-white transition">
-                Overview
-            </div>
-            <div onclick="showSection('moderation')" class="cursor-pointer hover:text-white transition">
-                Analysis
-            </div>
-            <div onclick="showSection('logs')" class="cursor-pointer hover:text-white transition">
-                Logs
-            </div>
-        </nav>
+    <div class="w-64 bg-gray-900 p-6 space-y-6">
+        <h1 class="text-2xl font-bold">Sentinel</h1>
+        <p class="text-xs text-gray-500">by GREM.xv</p>
     </div>
 
     <!-- Main -->
     <div class="flex-1 p-10 space-y-10">
 
-        <!-- DASHBOARD SECTION -->
-        <div id="dashboardSection">
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold">Sentinel Control Panel</h2>
-                <p class="text-gray-400 mt-1">
-                    Safety and factuality monitoring powered by GREM.xv
-                </p>
-            </div>
-
-            <div class="grid grid-cols-4 gap-6">
-                <div class="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                    <p class="text-gray-400">Total Requests</p>
-                    <p id="total" class="text-2xl font-bold mt-2">0</p>
-                </div>
-
-                <div class="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                    <p class="text-gray-400">Safe</p>
-                    <p id="safeCount" class="text-2xl font-bold mt-2 text-green-400">0</p>
-                </div>
-
-                <div class="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                    <p class="text-gray-400">Unsafe</p>
-                    <p id="unsafeCount" class="text-2xl font-bold mt-2 text-red-400">0</p>
-                </div>
-
-                <div class="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                    <p class="text-gray-400">Safety Ratio</p>
-                    <p id="safePercent" class="text-2xl font-bold mt-2">0%</p>
-                </div>
-            </div>
+        <div>
+            <h2 class="text-3xl font-bold">Sentinel Analysis</h2>
+            <p class="text-gray-400">Safety and factuality evaluation</p>
         </div>
 
-        <!-- MODERATION SECTION -->
-        <div id="moderationSection" class="hidden space-y-8">
+        <!-- Input -->
+        <div class="bg-gray-900 p-6 rounded-xl space-y-4">
+            <textarea
+                id="inputText"
+                placeholder="Enter text..."
+                class="w-full p-4 bg-gray-800 rounded-lg border border-gray-700"
+                rows="5"
+            ></textarea>
 
-            <div>
-                <h2 class="text-3xl font-bold">Sentinel Analysis Engine</h2>
-                <p class="text-gray-400">Evaluate content safety and factual integrity</p>
-            </div>
-
-            <div class="bg-gray-900 p-6 rounded-xl border border-gray-800 space-y-4">
-                <textarea
-                    id="inputText"
-                    placeholder="Enter content for analysis..."
-                    class="w-full p-4 bg-gray-800 rounded-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    rows="5"
-                ></textarea>
-
-                <button
-                    onclick="analyze()"
-                    class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-semibold transition"
-                >
-                    Run Sentinel Scan
-                </button>
-            </div>
-
-            <div id="resultCard" class="hidden bg-gray-900 p-6 rounded-xl border border-gray-800 space-y-4">
-
-                <div id="statusBadge" class="px-4 py-2 rounded-lg inline-block font-bold"></div>
-
-                <div><strong>Safety Score:</strong> <span id="score"></span>%</div>
-                <div><strong>Risk Category:</strong> <span id="category"></span></div>
-                <div><strong>Reason:</strong> <p id="reason" class="text-gray-300 mt-1"></p></div>
-
-                <hr class="border-gray-700">
-
-                <div><strong>Factual Status:</strong> <span id="factualStatus"></span></div>
-                <div><strong>Factuality Score:</strong> <span id="factualScore"></span>%</div>
-                <div><strong>Factuality Reason:</strong> <p id="factualReason" class="text-gray-300 mt-1"></p></div>
-
-                <div>
-                    <strong>Safer Response:</strong>
-                    <div id="safeResponse" class="bg-gray-800 p-3 rounded-lg mt-2"></div>
-                </div>
-
-                <div>
-                    <strong>Corrected Response:</strong>
-                    <div id="correctedResponse" class="bg-gray-800 p-3 rounded-lg mt-2"></div>
-                </div>
-
-            </div>
+            <button
+                onclick="analyze()"
+                class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded-lg font-semibold"
+            >
+                Run Sentinel
+            </button>
         </div>
 
-        <!-- LOGS SECTION -->
-        <div id="logsSection" class="hidden">
+        <!-- Result -->
+        <div id="resultCard" class="hidden bg-gray-900 p-6 rounded-xl space-y-4">
 
-            <h2 class="text-3xl font-bold mb-6">Sentinel Activity Logs</h2>
+            <div id="statusBadge" class="px-4 py-2 rounded-lg inline-block font-bold"></div>
 
-            <div class="bg-gray-900 p-6 rounded-xl border border-gray-800 overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="border-b border-gray-700">
-                            <th class="p-2">ID</th>
-                            <th class="p-2">Input</th>
-                            <th class="p-2">Safe</th>
-                            <th class="p-2">Safety Score</th>
-                            <th class="p-2">Factual</th>
-                            <th class="p-2">Factuality Score</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logsTable"></tbody>
-                </table>
+            <div><strong>Safety Score:</strong> <span id="score"></span>%</div>
+            <div><strong>Risk Category:</strong> <span id="category"></span></div>
+            <div><strong>Reason:</strong> <p id="reason"></p></div>
+
+            <hr class="border-gray-700">
+
+            <div><strong>Factual:</strong> <span id="factualStatus"></span></div>
+            <div><strong>Factuality Score:</strong> <span id="factualScore"></span>%</div>
+            <div><strong>Factuality Reason:</strong> <p id="factualReason"></p></div>
+
+            <div><strong>Safer Response:</strong>
+                <div id="safeResponse" class="bg-gray-800 p-3 rounded-lg"></div>
+            </div>
+
+            <div><strong>Corrected Response:</strong>
+                <div id="correctedResponse" class="bg-gray-800 p-3 rounded-lg"></div>
             </div>
 
         </div>
@@ -142,7 +69,52 @@
 </div>
 
 <script>
-// (Your existing JS stays exactly the same)
+
+async function analyze() {
+
+    const text = document.getElementById("inputText").value;
+
+    const response = await fetch("/check", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer sk-client-024"
+        },
+        body: JSON.stringify({ text: text })
+    });
+
+    const data = await response.json();
+
+    document.getElementById("resultCard").classList.remove("hidden");
+
+    document.getElementById("statusBadge").innerText =
+        data.safe ? "SAFE" : "UNSAFE";
+
+    document.getElementById("statusBadge").className =
+        data.safe
+            ? "px-4 py-2 rounded-lg inline-block font-bold bg-green-600"
+            : "px-4 py-2 rounded-lg inline-block font-bold bg-red-600";
+
+    document.getElementById("score").innerText = data.safety_score || 0;
+    document.getElementById("category").innerText = data.risk_category || "N/A";
+    document.getElementById("reason").innerText = data.reason || "N/A";
+
+    document.getElementById("factualStatus").innerText =
+        data.factual ? "FACTUAL" : "NON-FACTUAL";
+
+    document.getElementById("factualScore").innerText =
+        data.factuality_score || 0;
+
+    document.getElementById("factualReason").innerText =
+        data.factuality_reason || "N/A";
+
+    document.getElementById("safeResponse").innerText =
+        data.safer_response || "N/A";
+
+    document.getElementById("correctedResponse").innerText =
+        data.corrected_response || "N/A";
+}
+
 </script>
 
 </body>
