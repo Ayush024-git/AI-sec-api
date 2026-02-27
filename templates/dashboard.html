@@ -23,7 +23,7 @@
             <p class="text-gray-400">Safety and factuality evaluation</p>
         </div>
 
-        <!-- Input Card -->
+        <!-- Input -->
         <div class="bg-gray-900 p-6 rounded-xl space-y-4">
             <textarea
                 id="inputText"
@@ -40,10 +40,12 @@
             </button>
         </div>
 
-        <!-- Result Card -->
+        <!-- Result -->
         <div id="resultCard" class="hidden bg-gray-900 p-6 rounded-xl space-y-4">
 
-            <div id="statusBadge" class="px-4 py-2 rounded-lg inline-block font-bold"></div>
+            <div id="statusBadge"
+                 class="px-4 py-2 rounded-lg inline-block font-bold">
+            </div>
 
             <div><strong>Safety Score:</strong> <span id="score">0</span>%</div>
             <div><strong>Risk Category:</strong> <span id="category">N/A</span></div>
@@ -75,9 +77,8 @@
 async function analyze() {
 
     const text = document.getElementById("inputText").value.trim();
-
     if (!text) {
-        alert("Please enter text to analyze.");
+        alert("Please enter text.");
         return;
     }
 
@@ -93,12 +94,11 @@ async function analyze() {
         });
 
         const data = await response.json();
-
-        console.log("API Response:", data);
+        console.log("API:", data);
 
         document.getElementById("resultCard").classList.remove("hidden");
 
-        // -------- SAFE HANDLING --------
+        // ---- SAFE BOOLEAN FIX ----
         const isSafe = String(data.safe).toLowerCase() === "true";
 
         document.getElementById("statusBadge").innerText =
@@ -109,41 +109,53 @@ async function analyze() {
                 ? "px-4 py-2 rounded-lg inline-block font-bold bg-green-600"
                 : "px-4 py-2 rounded-lg inline-block font-bold bg-red-600";
 
-        // -------- SAFETY DATA --------
-        document.getElementById("score").innerText =
-            parseInt(data.safety_score) || 0;
+        // ---- SAFETY SCORE FIX ----
+        let safetyScore = Number(data.safety_score);
 
+        if (!isNaN(safetyScore)) {
+            if (safetyScore <= 1) {
+                safetyScore = Math.round(safetyScore * 100);
+            }
+        } else {
+            safetyScore = 0;
+        }
+
+        document.getElementById("score").innerText = safetyScore;
         document.getElementById("category").innerText =
             data.risk_category || "N/A";
-
         document.getElementById("reason").innerText =
             data.reason || "N/A";
 
-        // -------- FACTUAL HANDLING --------
+        // ---- FACTUAL BOOLEAN FIX ----
         const isFactual = String(data.factual).toLowerCase() === "true";
 
         document.getElementById("factualStatus").innerText =
             isFactual ? "FACTUAL" : "NON-FACTUAL";
 
-        document.getElementById("factualScore").innerText =
-            parseInt(data.factuality_score) || 0;
+        // ---- FACTUAL SCORE FIX ----
+        let factualScore = Number(data.factuality_score);
 
+        if (!isNaN(factualScore)) {
+            if (factualScore <= 1) {
+                factualScore = Math.round(factualScore * 100);
+            }
+        } else {
+            factualScore = 0;
+        }
+
+        document.getElementById("factualScore").innerText = factualScore;
         document.getElementById("factualReason").innerText =
             data.factuality_reason || "N/A";
 
-        // -------- REWRITES --------
         document.getElementById("safeResponse").innerText =
             data.safer_response || "N/A";
 
         document.getElementById("correctedResponse").innerText =
             data.corrected_response || "N/A";
 
-    } catch (error) {
-
-        console.error(error);
-
-        alert("Error connecting to Sentinel API.");
-
+    } catch (err) {
+        console.error(err);
+        alert("Failed to connect to Sentinel API.");
     }
 }
 
